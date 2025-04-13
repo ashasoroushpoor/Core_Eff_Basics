@@ -1,0 +1,64 @@
+% !TeX TS-program = xelatex
+% !BIB TS-program = bibtex
+
+% Full instructions available at:
+% https://github.com/pcafrica/focus-beamertheme
+
+
+\documentclass{beamer}
+\usepackage[yyyymmdd]{datetime}
+\usepackage{tikz}
+\usetikzlibrary{quantikz2}
+\usepackage{amsmath}
+\usepackage{xfrac}
+\usepackage{mathdots}
+\usepackage{nccmath}
+\usepackage{algpseudocode}
+
+\usetheme{focus}
+
+
+\definecolor{main}{RGB}{55, 135, 177}
+\definecolor{text}{RGB}{60, 60, 80}
+\definecolor{background}{RGB}{255, 255, 255}
+
+\setmathfont{Latin Modern Math}[range={frak,\bigcap,\bigcup}]
+\newif\ifplacelogo % create a new conditional
+\placelogotrue % set it to true
+
+
+\newcommand{\foralll}[2]{\overset{{#2}}{\underset{{#1}}{\Large \forall}}}
+\newcommand{\existss}[2]{\overset{{#2}}{\underset{{#1}}{\Large \exists}}}
+\newcommand{\orr}[2]{\overset{{#2}}{\underset{{#1}}{\Large \lor}}}
+\newcommand{\andd}[2]{\overset{{#2}}{\underset{{#1}}{\Large \land}}}
+
+
+
+\setbeamercovered{transparent}
+
+\title{Into the Quantum Realm:\\ On the Collapsible Polynomial Hierarchy for Promise Problems}
+\subtitle{Advanced Algorithm Course}
+\author{Abolfazl Ghorbani\texorpdfstring{\\}{,} Asha Soroushpoor}
+% \titlegraphic{\includegraphics[scale=1.25]{focus-logo.pdf}}
+\titlegraphic{\includegraphics[scale=.21]{images/tu-logo-hckd2.png}}
+\logo{\ifplacelogo\includegraphics[height=1cm]{images/tu-logo-hckd2.png}\fi}
+\institute{University of Tehran}
+\date{\today}
+
+
+
+% Footline info is printed only if [numbering=fullbar].
+%\footlineinfo{Custom footline text}
+
+\begin{document}
+    \input{Beginning.tex}
+    
+    % Use starred version (e.g. \section*{Section name})
+    % to disable (sub)section page.
+    \input{Z-PolynomialTime-Hierarchy.tex}
+    \input{Z-PromiseProblems.tex}
+    \input{Section1.tex}
+    \input{Z-PH of Promise.tex}
+   
+    \input{End.tex}
+\end{document}
