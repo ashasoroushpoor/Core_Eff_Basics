@@ -1,4 +1,4 @@
-% Copyright (C) 2018 - 2023 Pasquale Claudio Africa and the LaTeX community.
+% Copyright (C) 2018 - 2024 Pasquale Claudio Africa and the LaTeX community.
 % A full list of contributors can be found at
 %
 %     https://github.com/pcafrica/focus-beamertheme
@@ -205,11 +205,6 @@
 % Empty footline.
 \defbeamertemplate{footline}{none}{}
 
-% Empty footline for noframenumbering.
-\defbeamertemplate{footline}{noframenumbering}{
-    \addtocounter{framenumber}{-1}
-}
-
 \DeclareOptionBeamer{numbering}{\def\beamer@focus@numbering{#1}}
 \ExecuteOptionsBeamer{numbering=progressbar}
 
@@ -278,7 +273,7 @@
 
 % Enable noframenumbering option.
 \define@key{beamerframe}{noframenumbering}[true]{%
-    \setbeamertemplate{footline}[noframenumbering]%
+    \addtocounter{framenumber}{-1}
     \setlength{\focus@pbar@height}{0cm}%
     \focus@calculatefootheight%
 }
