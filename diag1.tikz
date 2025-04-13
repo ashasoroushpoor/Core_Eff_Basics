@@ -1,0 +1,15 @@
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily},
+    computation/.style={draw, circle, minimum size=2.4cm, align=center},
+    >=Latex
+]
+
+% Nodes
+\node[computation] (C1) at (0, 0) {Computation};
+\node[computation] (C2) at (5, 0) {Computation};
+
+% Arrows
+\draw[->, thick] (C1.east) -- node[above, align=center] {\small handler\\[-2pt]from an effect} (C2.west);
+\draw[<-, thick] (C1.south east) to[bend right=30] node[below, align=center] {\small handlers\\[-2pt]respond} (C2.south west);
+
+\end{tikzpicture}

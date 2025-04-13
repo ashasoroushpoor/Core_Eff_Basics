@@ -1,0 +1,158 @@
+\section{Introductions}
+\subsection{Algebraic Effects \& Handlers}
+
+
+\begin{frame}{The Problem with Traditional Type Systems}
+  \begin{itemize}
+    \item Traditional type systems describe \textbf{entities of pure computation}, but not \textbf{computational effects}.
+    \vspace{0.5em}
+    \item Effects (like exceptions, I/O, state) are:
+      \begin{itemize}
+        \item Invisible to the type system
+        \item Difficult to reason about or restrict
+        \item Cause code to be less modular and harder to verify
+      \end{itemize}
+    \vspace{0.5em}
+    \item There is a need to unify the formal definition of computational effects under some abstract definition.
+  \end{itemize}
+\end{frame}
+\begin{frame}{What Are Algebraic Effects?}
+  \begin{itemize}
+    \item \textbf{Algebraic effects} describe computational effects via \textit{abstract operations}.
+    \vspace{0.5em}
+    \item Examples:
+      \begin{itemize}
+        \item \texttt{raise : string $\to$ $\_$} \hfill (exceptions)
+        \item \texttt{get : unit $\to$ int} \hfill (state)
+        \item \texttt{choose : unit $\to$ bool} \hfill (nondeterminism)
+      \end{itemize}
+    \vspace{0.5em}
+    \item Think of them as \textbf{requests} for effects, not implementations.
+    \vspace{0.5em}
+    \item Separate the notion of \textit{what an effect is} from \textit{how it is handled}.
+  \end{itemize}
+\end{frame}
+% \begin{frame}{What Are Algebraic Effects?}
+% \centering
+% \input{diag1.tikz}
+% \end{frame}
+
+\begin{frame}{Handlers: The Dual Viewpoint}
+  \begin{columns}[c]
+    \column{0.55\textwidth}
+    \begin{itemize}
+      \item \textbf{Handlers} define how effects are interpreted.
+      \vspace{0.5em}
+      \item Think of them as \textbf{responders} to abstract operations.
+      \vspace{0.5em}
+      \item Example clauses:
+      \begin{itemize}
+        \item \texttt{val x $\Rightarrow$ c\textsubscript{val}}
+        \item \texttt{op y k $\Rightarrow$ c\textsubscript{op}}
+      \end{itemize}
+      \vspace{0.5em}
+      \item First-class and composable.
+    \end{itemize}
+
+    \column{0.45\textwidth}
+    \centering
+    % \includegraphics[width=0.9\textwidth]{computation_handler_diagram.png}
+    \resizebox{0.8\linewidth}{!}{%
+  \input{diag1.tikz}
+}
+    
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Motivation Through Examples}
+\vspace{-0.5em}
+\begin{block}{Nondeterministic Choice with \texttt{Choose}}
+\begin{verbatim}
+effect Choose : unit -> bool
+
+let flip = Choose()
+
+with handler
+  val x => x
+  | Choose() k => k(true) || k(false)
+handle
+  if flip then "Heads" else "Tails"
+\end{verbatim}
+\end{block}
+\vspace{0.5em}
+\begin{itemize}
+  \item \texttt{Choose()} is an effect request — “flip a coin”
+  \item Handler responds by exploring \texttt{true} and \texttt{false}
+  \item Result: evaluates to both “Heads” and “Tails”
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Message Passing: \texttt{Send} and \texttt{Receive} Effects}
+\vspace{-0.5em}
+\begin{block}{\scriptsize Effect Declarations and \texttt{ping}}
+\begin{scriptsize}
+\begin{verbatim}
+effect Send : int -> unit
+effect Receive : unit -> int
+
+let ping =
+  for i = 1 to 3 do
+    Send(i);
+    let msg = Receive() in
+    Printf.printf "Ping received %d\n" msg
+  done
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+\vspace{0.3em}
+\begin{itemize}
+  \item \texttt{Send} and \texttt{Receive} are abstract operations.
+  \item \texttt{ping} sends values and receives replies.
+  \item Handler decides what message passing means.
+\end{itemize}
+\end{frame}
+\begin{frame}[fragile]{Message Passing: The \texttt{pong} Side}
+\vspace{-0.5em}
+\begin{block}{\scriptsize \texttt{pong} Responds to \texttt{ping}}
+\begin{scriptsize}
+\begin{verbatim}
+let pong =
+  for _ = 1 to 3 do
+    let msg = Receive() in
+    Printf.printf "Pong received %d\n" msg;
+    Send(msg + 100)
+  done
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+\vspace{0.3em}
+\begin{itemize}
+  \item \texttt{pong} waits for a message, processes it, and replies.
+  \item Sends back \texttt{msg + 100} after each receive.
+  \item This effectful back-and-forth models structured concurrency.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Message Passing: The Handler Orchestrates Interaction}
+\vspace{-0.5em}
+\begin{block}{\scriptsize A Simple Message Passing Handler}
+\begin{scriptsize}
+\begin{verbatim}
+let rec run ping pong =
+  match ping() with
+  | effect Send msg -> run (fun () -> ping()) (fun () -> pong msg)
+  | effect Receive () -> match pong() with
+      | effect Send reply -> run (fun () -> ping reply) (fun () -> pong())
+      | val _ -> ()
+  | val _ -> ()
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+
+\vspace{0.3em}
+\begin{itemize}
+  \item `ping()` and `pong()` are resumed via continuations.
+  \item The handler intercepts `Send` and `Receive`, and routes messages.
+  \item Implements **bidirectional control flow** via algebraic effects.
+\end{itemize}
+\end{frame}
