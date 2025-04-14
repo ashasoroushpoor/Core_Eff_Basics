@@ -1,0 +1,577 @@
+\section{Operational Semantics Of Core-Eff}
+
+\begin{frame}{Operational Semantics: Values and \texttt{val}}
+\textbf{Values:}
+\[
+v ::= x \mid \texttt{fun } x \Rightarrow c \mid \texttt{handler } \cdots
+\]
+\begin{itemize}
+  \item Values are fully evaluated and are not reducible.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Computation form:}
+\[
+\texttt{val } v
+\]
+\begin{itemize}
+  \item A computation that simply returns value \( v \).
+  \item This is a \emph{terminal configuration} under the small-step semantics.
+  \item There is \textbf{no reduction rule} for \texttt{val v}, i.e., no \( \texttt{val } v \rightsquigarrow \cdots \)
+\end{itemize}
+
+\vspace{1em}
+This is the base case for computations — the final result before effects or handlers are involved.
+\end{frame}
+
+\begin{frame}{Small-Step Semantics: \texttt{if} and \texttt{match}}
+
+\textbf{Conditional branching:}
+\[
+\frac{}{\texttt{if true then } c_1 \texttt{ else } c_2 \rightsquigarrow c_1}
+\]
+\[
+\frac{}{\texttt{if false then } c_1 \texttt{ else } c_2 \rightsquigarrow c_2}
+\]
+
+\vspace{1em}
+\textbf{Pattern matching:}
+\[
+\frac{}{\texttt{match } 0 \texttt{ with } 0 \Rightarrow c_1 \mid S\,x \Rightarrow c_2 \mapsto c_1}
+\]
+\[
+\frac{}{\texttt{match } S\,v \texttt{ with } 0 \Rightarrow c_1 \mid S\,x \Rightarrow c_2 \mapsto c_2[v/x]}
+\]
+
+\vspace{1em}
+\textbf{Note:} \texttt{if} and \texttt{match} reduce only when their scrutinees are values.
+\end{frame}
+
+\begin{frame}{Small-Step Semantics: \texttt{fun}, \texttt{let}, and \texttt{with}}
+
+\textbf{Function application:}
+\[
+\frac{}{(\texttt{fun } x \Rightarrow c)\ v \rightsquigarrow c[v/x]}
+\]
+
+\vspace{1em}
+\textbf{Let-binding:}
+\[
+\frac{}{ \texttt{let } x = \texttt{val } v \texttt{ in } c \rightsquigarrow c[v/x] }
+\]
+\[
+\frac{c_1 \rightsquigarrow c_1'}{\texttt{let } x = c_1 \texttt{ in } c_2 \rightsquigarrow \texttt{let } x = c_1' \texttt{ in } c_2}
+\]
+
+\vspace{1em}
+\textbf{Handler congruence:}
+\[
+\frac{c \rightsquigarrow c'}{\texttt{with } e \texttt{ handle } c \rightsquigarrow \texttt{with } e \texttt{ handle } c'}
+\]
+
+% \vspace{1em}
+% Only one subterm is reduced per step — all rules are in left-to-right evaluation order.
+\end{frame}
+
+\begin{frame}{Small-Step Semantics: Effect Invocation}
+\textbf{Effect operation call:}
+\[
+\frac{}{
+  \texttt{let } x = \iota \# \texttt{op } e \texttt{ in } c
+  \rightsquigarrow
+  \iota \# \texttt{op } e (y.\ \texttt{let } x = y \texttt{ in } c)
+}
+\]
+
+\vspace{1.5em}
+\textbf{Explanation:}
+\pause
+\begin{itemize}
+  \item This rule models an \emph{unhandled effect}. So for the effect to be handled the operation must be propogated with this rule.
+  \item It suspends the computation, exposing the continuation as a function of the result.
+  \item The handler, if present, will later match and resume from this.
+\end{itemize}
+\end{frame}
+
+% \begin{frame}{Small-Step Semantics: Handling Operations (Full Rule)}
+
+% \textbf{Handler (operation case):}
+% \[
+% \frac{
+%   \begin{array}{l}
+%     h = \texttt{handler val } x \Rightarrow c_v \mid \texttt{op } x\ k \Rightarrow c_{op} \\
+%     r = \iota \# \texttt{op } e\ (y.c) \\
+%     \\
+%     \texttt{with } h\ \texttt{handle } r \rightsquigarrow c_{op}
+%     [e/x,\ (\texttt{fun } y \Rightarrow \texttt{with } h\ \texttt{handle } c)/k]
+%   \end{array}
+% }{
+%   \texttt{with } h\ \texttt{handle } r \rightsquigarrow \cdots
+% }
+% \]
+
+% \vspace{1em}
+% This rule applies when an operation \texttt{op} from instance \(\iota\) is matched by handler \(h\),
+% and constructs a resumption to continue the suspended computation.
+% \end{frame}
+\begin{frame}{Small-Step Semantics: Handler Rule }
+
+\[
+\frac{
+  h = \texttt{handler val } x \mapsto c_v \mid ocs
+  \qquad
+  (op: A^{op} \rightarrow B^{op}) \in \Sigma_E
+}{
+\begin{aligned}
+  & \texttt{with } h \texttt{ handle } (\iota \# \texttt{op } e\ (y.c)) \rightsquigarrow \\
+  & ocs_{ \iota \# \texttt{op }} (e, \lambda y:B^{op} \mapsto \texttt{with } h \texttt{ handle } c)
+\end{aligned}
+}
+\]
+
+% \begin{prooftree}
+%     \AxiomC{$$h = \texttt{handler val } x \mapsto c_v \mid ocs$$}
+%     \AxiomC{$$(op: A^{op} \rightarrow B^{op}) \in \Sigma_E$$}
+%     \BinaryInfC{
+%     $$
+%     \begin{aligned}
+%   & \texttt{with } h \texttt{ handle } (\iota \# \texttt{op } e\ (y.c)) \rightsquigarrow \\
+%   & ocs_{ \iota \# \texttt{op }} (e, \lambda y:B^{op} \mapsto \texttt{with } h \texttt{ handle } c)
+
+% \end{aligned}
+% $$
+% }
+% \end{prooftree}
+
+where
+
+\begin{aligned}
+& (nil)_{\iota \# \texttt{op }}(e,\kappa) = \iota \# \texttt{op } e (y. \kappa y) \hfill \\
+& (\iota' \# \texttt{op' } x k \mapsto c \mid ocs)_{\iota \# \texttt{op }} (e, \kappa) =
+\begin{cases}
+      c [ e/x, \kappa / k ] & \text{if }\ \iota \# \texttt{op} = \iota' \# \texttt{op' } \\
+      ocs_{\iota \# \texttt{op}}(e, \kappa) & \text{otherwise}
+    \end{cases}
+\end{aligned}
+
+\end{frame}
+
+\begin{frame}{Example: Handling an Operation — \texttt{Choose}}
+
+\textbf{Effect:}
+\[
+\texttt{effect Choose : unit} \rightarrow \texttt{bool}
+\]
+
+\textbf{Computation:}
+\[
+\texttt{let x = perform (Choose ()) in if x then 1 else 2}
+\]
+
+\textbf{Handler:}
+\[
+\texttt{handler val x} \mapsto [x] \mid
+\texttt{Choose } u\ k \mapsto k(\texttt{true}) @ k(\texttt{false})
+\]
+
+% \vspace{1em}
+\textbf{Operational Step:}
+\[
+\texttt{with h handle let x = } \iota \# \texttt{Choose () in if x then 1 else 2} 
+\rightsquigarrow \\
+\texttt{let x = true in if x then 1 else 2} @
+\texttt{let x = false in if x then 1 else 2}
+\]
+
+% \vspace{1em}
+% \textbf{Handler applies the rule:}
+% \begin{itemize}
+%   \item Matches operation: \( \iota \# \texttt{Choose} \)
+%   \item Binds \( e = () \)
+%   \item Continuation \( \kappa = \lambda y.\ \texttt{with h handle let x = y in if x then 1 else 2} \)
+%   \item Resumes with both \( \texttt{true} \) and \( \texttt{false} \)
+% \end{itemize}
+\end{frame}
+
+% \begin{frame}{Example 3.1 — Initial Term Under Handler}
+
+% \[
+% \\
+% \texttt{with } h \texttt{ handle }\\
+% \texttt{let } x_1 = \iota \# \texttt{lookup }() \texttt{ in } \\
+% \texttt{let } x_2 = \iota \# \texttt{update } x_1 \texttt{ in }
+% \texttt{val (succ } x_1)
+% \]
+
+% \vspace{1em}
+% \textbf{Handler:}
+% \[
+% \texttt{handler}
+% \begin{cases}
+% \texttt{val } x \mapsto \iota \# \texttt{update } x \\
+% \iota \# \texttt{lookup } x\ k \mapsto k\ 1 \\
+% \iota \# \texttt{update } x\ k \mapsto k\ ()
+% \end{cases}
+% \]
+
+% \vspace{1em}
+% \textbf{Goal:} Reduce this computation step-by-step according to the Core Eff small-step semantics.
+% \end{frame}
+
+\begin{frame}{Example 3.1 — Initial Configuration}
+
+\textbf{Expression:}
+\begin{align*}
+&\texttt{with } h\ \texttt{handle let } x_1 = \iota \# \texttt{lookup }() \\
+&\quad \texttt{in let } x_2 = \iota \# \texttt{update } x_1 \\
+&\quad \texttt{in val (succ } x_1)
+\end{align*}
+
+\textbf{Handler:}
+\[
+\texttt{handler}
+\begin{cases}
+  \texttt{val } x \mapsto \iota \# \texttt{update } x \\
+  \iota \# \texttt{lookup } x\ k \mapsto k\ 1 \\
+  \iota \# \texttt{update } x\ k \mapsto k\ ()
+\end{cases}
+\]
+\end{frame}
+
+\begin{frame}{Step 1 — Suspend \texttt{lookup}}
+
+\begin{align*}
+&\texttt{let } x_1 = \iota \# \texttt{lookup }() \texttt{ in } c \\
+&\rightsquigarrow \iota \# \texttt{lookup }() \left(y_1.\ \texttt{let } x_1 = \texttt{val } y_1 \texttt{ in } c\right)
+\end{align*}
+
+Apply to our term:
+\begin{align*}
+&\texttt{with } h\ \texttt{handle } \iota \# \texttt{lookup }() \Big(y_1. \texttt{let } x_1 = \texttt{val } y_1 \\
+&\quad \texttt{in let } x_2 = \iota \# \texttt{update } x_1 \\
+&\quad \texttt{in val (succ } x_1)\Big)
+\end{align*}
+\end{frame}
+
+\begin{frame}{Step 2 — Apply \texttt{lookup} Handler}
+
+Handler clause:
+\[
+\iota \# \texttt{lookup } x\ k \mapsto k\ 1
+\]
+
+Apply:
+\begin{align*}
+k &= \lambda y_1.\ \texttt{with } h\ \texttt{handle let } x_1 = \texttt{val } y_1 \\
+  &\quad \texttt{in let } x_2 = \iota \# \texttt{update } x_1 \\
+  &\quad \texttt{in val (succ } x_1)
+\end{align*}
+
+\textbf{Substitute 1 for \( y_1 \):}
+\begin{align*}
+&\texttt{with } h\ \texttt{handle let } x_1 = \texttt{val } 1 \\
+&\quad \texttt{in let } x_2 = \iota \# \texttt{update } x_1 \\
+&\quad \texttt{in val (succ } x_1)
+\end{align*}
+\end{frame}
+
+
+\begin{frame}{Step 3 — Reduce \texttt{update} and \texttt{succ}}
+
+\textbf{Substitute \( x_1 = 1 \):}
+\begin{align*}
+&\texttt{with } h\ \texttt{handle let } x_2 = \iota \# \texttt{update } 1 \texttt{ in val } 2
+\end{align*}
+
+\textbf{Desugar generic effect:}
+\begin{align*}
+&\equiv \texttt{with } h\ \texttt{handle let } x_2 = \iota \# \texttt{update } 1\ (y_2.\ \texttt{val } y_2) \\
+&\quad \texttt{in val } 2
+\end{align*}
+\end{frame}
+
+ \begin{frame}{Step 4 — Handle Second Operation}
+
+Suspend:
+\begin{align*}
+&\rightsquigarrow \texttt{with } h\ \texttt{handle } \iota \# \texttt{update } 1 \\
+&\quad \left(y_2.\ \texttt{let } x_2 = \texttt{val } y_2 \texttt{ in val } 2\right)
+\end{align*}
+
+Handler clause:
+\[
+\iota \# \texttt{update } x\ k \mapsto k\ ()
+\]
+
+Apply:
+\begin{align*}
+&\rightsquigarrow \texttt{with } h\ \texttt{handle let } x_2 = \texttt{val } () \texttt{ in val } 2 \\
+&\rightsquigarrow \texttt{with } h\ \texttt{handle val } 2
+\end{align*}
+\end{frame}
+
+\begin{frame}{Step 5 — Final Handler Clause Applies}
+
+Handler clause:
+\[
+\texttt{val } x \mapsto \iota \# \texttt{update } x
+\]
+
+Apply:
+\[
+\texttt{with } h\ \texttt{handle val } 2
+\rightsquigarrow
+\iota \# \texttt{update } 2
+\]
+
+\vspace{1em}
+\textbf{Final result:}
+\[
+\iota \# \texttt{update } 2
+\]
+
+This update is not handled — it escapes the scope of the handler.
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Core Judgment}
+
+\textbf{Form of the judgment:}
+\[
+\langle c, h \rangle \Downarrow r
+\]
+
+\textbf{Meaning:}
+\begin{itemize}
+  \item Under handler \( h \), computation \( c \) evaluates to result \( r \).
+  \item This result is either:
+    \begin{itemize}
+      \item A value: \( \texttt{val } v \)
+      \item A suspended operation: \( \iota \# \texttt{op } e (y.c) \)
+    \end{itemize}
+  \item The handler may handle effects as evaluation proceeds.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Possible Results}
+
+\textbf{Results \( r \) have two forms:}
+\[
+r ::= \texttt{val } v \quad \mid \quad \iota \# \texttt{op } e (y.c)
+\]
+
+\textbf{Interpretation:}
+\begin{itemize}
+  \item \( \texttt{val } v \): the computation completed with value \( v \)
+  \item \( \iota \# \texttt{op } e (y.c) \):
+    \begin{itemize}
+      \item An operation \( \texttt{op} \) was performed on instance \( \iota \)
+      \item \( e \) is the argument
+      \item \( y.c \) is the continuation (what happens next)
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Rule Format}
+
+Each rule is of the form:
+\[
+\frac{\text{premises}}{\langle c, h \rangle \Downarrow r}
+\]
+
+\textbf{Example:}
+\[
+\frac{}{\langle \texttt{val } v, h \rangle \Downarrow \texttt{val } v}
+\]
+
+This is the base case — returning a value directly.
+\end{frame}
+
+% \begin{frame}{Big-Step Semantics: Evaluation Judgment}
+
+% \textbf{Judgment:}
+% \[
+% c \Downarrow r
+% \]
+
+% \textbf{Result \(r\):}
+% \[
+% r ::= \texttt{val } e \quad \mid \quad \iota \# \texttt{op } e (x. c)
+% \]
+
+% \vspace{1em}
+% \textbf{Interpretation:}
+% \begin{itemize}
+%   \item \(c\) evaluates to a value \(e\), or
+%   \item suspends on an operation \(\iota \# \texttt{op}\), with continuation \(x.c\)
+% \end{itemize}
+% \end{frame}
+
+% \begin{frame}{Big-Step Semantics: Base Cases}
+
+% \begin{align*}
+% &\frac{}{\texttt{val } e \Downarrow \texttt{val } e} \\
+% &\frac{}{\iota \# \texttt{op } e (x. c) \Downarrow \iota \# \texttt{op } e (x. c)}
+% \end{align*}
+
+% \vspace{1em}
+% \textbf{A value returns itself, and an operation suspends immediately.}
+% \end{frame}
+
+\begin{frame}{Big-Step Semantics: Evaluation Judgment}
+
+\textbf{Judgment:}
+\[
+c \Downarrow r
+\]
+
+\textbf{Result \(r\):}
+\[
+r ::= \texttt{val } e \quad \mid \quad \iota \# \texttt{op } e (x. c)
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item \(c\) evaluates to a value \(e\), or
+  \item suspends on an operation \(\iota \# \texttt{op}\), with continuation \(x.c\)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Base Cases}
+
+\begin{align*}
+&\frac{}{\texttt{val } e \Downarrow \texttt{val } e} \\
+&\frac{}{\iota \# \texttt{op } e (x. c) \Downarrow \iota \# \texttt{op } e (x. c)}
+\end{align*}
+
+\vspace{1em}
+\textbf{A value returns itself, and an operation suspends immediately.}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Let Binding}
+
+\begin{align*}
+&\frac{c_1 \Downarrow \texttt{val } e \quad c_2[e/x] \Downarrow r}
+{\texttt{let } x = c_1 \texttt{ in } c_2 \Downarrow r}
+\\[1em]
+&\frac{c_1 \Downarrow \iota \# \texttt{op } e (y. c)}
+{\texttt{let } x = c_1 \texttt{ in } c_2 \Downarrow \iota \# \texttt{op } e (y. \texttt{let } x = c \texttt{ in } c_2)}
+\end{align*}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Conditionals and Matches}
+
+\begin{align*}
+&\frac{c_1 \Downarrow r}
+{\texttt{if true then } c_1 \texttt{ else } c_2 \Downarrow r}
+\\
+&\frac{c_2 \Downarrow r}
+{\texttt{if false then } c_1 \texttt{ else } c_2 \Downarrow r}
+\\[1em]
+&\frac{c_1 \Downarrow r}
+{\texttt{match } 0 \texttt{ with } 0 \mapsto c_1 \mid \texttt{succ } x \mapsto c_2 \Downarrow r}
+\\
+&\frac{c_2[e/x] \Downarrow r}
+{\texttt{match succ } e \texttt{ with } 0 \mapsto c_1 \mid \texttt{succ } x \mapsto c_2 \Downarrow r}
+\end{align*}
+\end{frame}
+
+\begin{frame}{Big-Step Semantics: Application and Recursion}
+
+\begin{align*}
+&\frac{c[e/x] \Downarrow r}
+{(\texttt{fun } x \mapsto c)\ e \Downarrow r}
+\\[1em]
+&\frac{c_2[(\texttt{fun } x \mapsto \texttt{let rec } f x = c_1 \texttt{ in } c_1)/f] \Downarrow r}
+{\texttt{let rec } f x = c_1 \texttt{ in } c_2 \Downarrow r}
+\end{align*}
+\end{frame}
+\begin{frame}{Handler Semantics: Handling \texttt{val}}
+
+\textbf{Handler:}
+\[
+h = \texttt{handler val } x \mapsto c_v \mid \texttt{op } x\ k \mapsto c_{\text{op}}
+\]
+
+\textbf{Rule:}
+\[
+\frac{c \Downarrow \texttt{val } e \quad c_v[e/x] \Downarrow r}
+{\texttt{with } h \texttt{ handle } c \Downarrow r}
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item If computation \( c \) evaluates to a value,
+  \item we substitute into the handler's \texttt{val} clause and evaluate it.
+\end{itemize}
+\end{frame}
+\begin{frame}{Handler Semantics: Handling an Operation}
+
+\textbf{Handler:}
+\[
+h = \texttt{handler val } x \mapsto c_v \mid \texttt{op } x\ k \mapsto c_{\text{op}}
+\]
+
+\textbf{Rule:}
+\[
+\frac{
+  c \Downarrow \iota \# \texttt{op } e (y. c') \quad
+  c_{\text{op}}[e/x,\ \lambda y.\ \texttt{with } h \texttt{ handle } c'/k] \Downarrow r
+}{
+  \texttt{with } h \texttt{ handle } c \Downarrow r
+}
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item If \( c \) suspends on an operation matched by \( h \),
+  \item we apply the handler’s \texttt{op} clause,
+  \item passing the argument \( e \) and a resumable continuation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Handler Semantics: Forwarding Unhandled Operations}
+
+\textbf{Rule (when operation is not handled):}
+\[
+\frac{
+  c \Downarrow \iota \# \texttt{op } e (y. c') \quad
+  r = \iota \# \texttt{op } e (y.\ \texttt{with } h \texttt{ handle } c')
+}{
+  \texttt{with } h \texttt{ handle } c \Downarrow r
+}
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item If the handler does not match the operation,
+  \item we re-emit it, wrapping the continuation with the same handler.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Proposition 3.2 — Semantic Equivalence}
+
+\textbf{Statement:}
+\[
+c \rightsquigarrow^{*} r \quad \Longleftrightarrow \quad c \Downarrow r
+\]
+
+\vspace{1em}
+\textbf{Explanation:}
+\begin{itemize}
+  \item \( \rightsquigarrow^{*} \): zero or more steps of the small-step reduction.
+  \item \( \Downarrow \): big-step evaluation to result \( r \).
+  \item \( r \): either a value \( \texttt{val } v \) or a suspended operation \( \iota \# \texttt{op } e (x. c) \).
+\end{itemize}
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item Big-step and small-step semantics produce the same results.
+  \item This ensures both operational models are equivalent and interchangeable.
+\end{itemize}
+
+\end{frame}

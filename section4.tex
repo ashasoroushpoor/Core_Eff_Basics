@@ -1,0 +1,503 @@
+\section{An Effect System}
+\subsection{Intro and Poisoning}
+
+\begin{frame}{Section 4: An Effect System}
+
+\textbf{Goal:}
+\begin{itemize}
+  \item Extend the type system to track not just \emph{what} a program computes,
+  but also \emph{which operations} it may perform.
+  \item Types become \textbf{dirty} — they carry information about effects.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Motivation:}
+\begin{itemize}
+  \item Distinguish between pure and effectful computations.
+  \item Enable more modular reasoning about side effects.
+  \item Support features like effect polymorphism and effect masking.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{The Poisoning Problem: Motivation}
+
+\textbf{Issue:} A function that \emph{could be pure} may be marked as effectful due to how it is defined.
+
+\vspace{1em}
+\textbf{Cause:}
+\begin{itemize}
+  \item In Core Eff, functions are first-class and effectful computations are values.
+  \item This means we can return functions from effectful contexts.
+  \item However, if such a function is returned from within a computation that performs effects, the \emph{entire function} may be marked as dirty — even if it doesn’t perform any effects.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Consequence:}
+\begin{itemize}
+  \item The function type becomes \emph{poisoned} by unrelated effects.
+  \item Makes type signatures overly conservative and imprecise.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{The Poisoning Problem:  Example}
+
+\textbf{Assume:}
+\begin{itemize}
+  \item A ground type \texttt{string}
+  \item An effect instance \( \texttt{std} : \texttt{Console}^R \), with:
+    \[
+    \Sigma(\texttt{Console}) = \{ \texttt{write} : \texttt{string} \rightarrow \texttt{unit} \}
+    \]
+\end{itemize}
+
+\vspace{1em}
+\textbf{Consider:}
+\begin{align*}
+& \texttt{let ignore} = \texttt{val (fun msg} \mapsto \texttt{val ()}) \\
+& \texttt{let f} = \texttt{if } b \texttt{ then (val ignore)} \\ 
+& \texttt{else val (std\#write) in val ignore}
+\end{align*}
+
+\vspace{1em}
+\textbf{What is the type of \texttt{ignore}?}
+\begin{itemize}
+  \item Ideally: \quad \( \texttt{string} \rightarrow \texttt{unit} \;!\; \emptyset \)
+  \item But in the conditional: \( \texttt{string} \rightarrow \texttt{unit} \;!\; \{ \texttt{std}\#\texttt{write} \} \)
+\end{itemize}
+\textbf{Problem:} the \texttt{ignore} function is pure, but gets \textbf{over-typed} due to context.
+\end{frame}
+
+\begin{frame}{Solving Poisoning via Subtyping}
+
+\textbf{Key idea:}
+\begin{itemize}
+  \item Allow a dirty type \( A\ !\ \Delta \) to be treated as \( A\ !\ \Delta' \) when \( \Delta' \subseteq \Delta \).
+  \item This lets us safely discard “irrelevant” effects from a type when they are not used.
+\end{itemize}
+
+\vspace{1em}
+\textbf{In the example:}
+\[
+\texttt{string} \rightarrow \texttt{unit} \;!\; \{ \texttt{std}\#\texttt{write} \}
+\le
+\texttt{string} \rightarrow \texttt{unit} \;!\; \emptyset
+\]
+
+\vspace{1em}
+\textbf{Benefit:}
+\begin{itemize}
+  \item Avoids over-tainting pure expressions.
+  \item Makes the type system more precise and modular.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Dirty Type Subtyping Rule}
+
+\textbf{Subtyping on dirty types:}
+\[
+\frac{A = A' \quad \Delta' \subseteq \Delta}
+{A\ !\ \Delta \leq A'\ !\ \Delta'}
+\]
+
+\vspace{1em}
+\textbf{This rule allows:}
+\begin{itemize}
+  \item Weakening the dirt component of a type
+  \item No change in the result type \( A \)
+\end{itemize}
+
+\vspace{1em}
+\textbf{Notation:} \( A\ !\ \Delta \leq A\ !\ \Delta' \)  
+means: we can treat a computation that may perform \( \Delta \) as one that may perform any smaller set \( \Delta' \)
+\end{frame}
+
+\begin{frame}{Core Eff Syntax: Types (with Dirt)}
+
+\textbf{Value types} \( A, B \) and \textbf{Computation types} \( C \) are defined as:
+
+\begin{align*}
+A, B ::= &\quad \alpha \quad \text{(type variable)} \\
+        &\mid \texttt{bool} \mid \texttt{nat} \mid \texttt{string} \mid \dots \\
+        &\mid A \rightarrow C \quad \text{(function type)} \\
+        &\mid E^R \quad \text{(effect instance of type } E \text{ at region } R) \\
+        &\mid \texttt{handler } C \Rightarrow D \quad \text{(handler type)}
+\end{align*}
+
+\vspace{0.5em}
+
+\begin{align*}
+C, D ::= A\ !\ \Delta \quad \text{(computation type with dirt)}
+\end{align*}
+
+\vspace{1em}
+
+\textbf{Dirt} \( \Delta \): a finite set of operation labels of the form \( \iota \# \texttt{op} \)
+
+\end{frame}
+
+\begin{frame}{Effect Signatures, Regions, and Dirt}
+
+\textbf{Effect Signature \( \Sigma \):}
+\[
+\Sigma(E) = \{ \texttt{op}_i : A_i \rightarrow B_i \}_{i \in I}
+\quad \text{for each effect name } E
+\]
+
+\vspace{0.5em}
+\textbf{Effect Instances:}
+\[
+\iota : E^R
+\quad \text{means } \iota \text{ is an instance of effect } E \text{ in region } R
+\]
+
+\vspace{1em}
+\textbf{Operation Labels:}
+\[
+\iota \# \texttt{op}
+\quad \text{identifies the operation } \texttt{op} \text{ performed on instance } \iota
+\]
+
+\vspace{1em}
+\textbf{Dirt:}
+\[
+\Delta \subseteq \{ \iota \# \texttt{op} \}
+\quad \text{is a finite set of operation labels}
+\]
+
+\vspace{1em}
+\textbf{Dirty type:}
+\[
+A\ !\ \Delta \quad \text{means: computation returning } A \text{ may perform effects } \Delta
+\]
+
+\end{frame}
+\subsection{Type system}
+\begin{frame}{Typing Judgments and Contexts}
+
+\textbf{Typing judgments:}
+$$
+\Gamma \tvdash e : A
+\qquad
+\Gamma \tvdash c : A\ !\ \Delta
+$$
+
+\begin{itemize}
+  \item \( e \): a pure expression, producing a value of type \( A \)
+  \item \( c \): a computation, producing a result of type \( A \), possibly performing effects \( \Delta \)
+\end{itemize}
+
+\vspace{1em}
+\textbf{Typing context \( \Gamma \):}
+\begin{itemize}
+  \item A finite set of assumptions of the form:
+    \begin{itemize}
+      \item \( x : A \) — term variables
+      \item \( \alpha \) — type variables
+      \item \( R \) — region variables
+    \end{itemize}
+\end{itemize}
+
+\vspace{1em}
+\textbf{Note:} We write \( \Gamma, x : A \tvdash e : B \) to extend contexts.
+\end{frame}
+
+\begin{frame}{Typing Rules: Constants and Variables}
+
+\textbf{Pure value judgments:}
+\[
+\Gamma \tvdash e : A
+\]
+
+\vspace{1em}
+
+\[
+\frac{c : \texttt{const of type } A}
+{\Gamma \tvdash c : A}
+\quad\textsc{(Const)}
+\]
+
+\vspace{1em}
+
+\[
+\frac{x : A \in \Gamma}
+{\Gamma \tvdash x : A}
+\quad\textsc{(Var)}
+\]
+
+\end{frame}
+
+\begin{frame}{Typing Rules: Functions and Applications}
+
+\textbf{Judgment form:}
+\[
+\Gamma \tvdash e : A
+\qquad
+\Gamma \tvdash c : A\ !\ \Delta
+\]
+
+\vspace{1em}
+
+\textbf{Function abstraction:}
+\[
+\frac{\Gamma, x : A \tvdash c : B\ !\ \Delta}
+{\Gamma \tvdash \texttt{fun } x \mapsto c : A \rightarrow B\ !\ \Delta}
+\quad\textsc{(Fun)}
+\]
+
+\vspace{1.5em}
+
+\textbf{Function application:}
+\[
+\frac{
+  \Gamma \tvdash v_1 : A \rightarrow B\ !\ \Delta
+  \quad
+  \Gamma \tvdash v_2 : A
+}{
+  \Gamma \tvdash v_1\ v_2 : B\ !\ \Delta
+}
+\quad\textsc{(App)}
+\]
+
+\end{frame}
+
+\begin{frame}{Typing Rule: \texttt{val} (Subtyping-Safe)}
+
+\textbf{Rule:}
+\[
+\frac{\Gamma \tvdash e : A}
+{\Gamma \tvdash \texttt{val } e : A\ !\ \emptyset}
+\quad\textsc{(Val)}
+\]
+
+\vspace{1em}
+\textbf{Key Point:}
+\begin{itemize}
+  \item The `val` construct lifts a pure expression into a pure computation.
+  \item The resulting computation has dirt \( \emptyset \).
+\end{itemize}
+
+\vspace{1em}
+\textbf{Why this is general:}
+\begin{itemize}
+  \item Due to subtyping:
+  \[
+  A\ !\ \emptyset \leq A\ !\ \Delta \quad \text{for any } \Delta
+  \]
+  \item This allows us to type `val e` at any dirt level needed downstream.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: \texttt{let}}
+
+\textbf{Rule:}
+\[
+\frac{
+  \Gamma \tvdash c_1 : A\ !\ \Delta_1
+  \quad
+  \Gamma, x : A \tvdash c_2 : B\ !\ \Delta_2
+}{
+  \Gamma \tvdash \texttt{let } x = c_1 \texttt{ in } c_2 : B\ !\ \Delta_1 \cup \Delta_2
+}
+\quad\textsc{(Let)}
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item Run \( c_1 \), bind its result to \( x \), then run \( c_2 \).
+  \item All effects from both computations are accumulated.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Sequencing \texttt{c₁ ; c₂}}
+
+\textbf{Rule:}
+\[
+\frac{
+  \Gamma \tvdash c_1 : A\ !\ \Delta_1
+  \quad
+  \Gamma \tvdash c_2 : B\ !\ \Delta_2
+}{
+  \Gamma \tvdash c_1\ ;\ c_2 : B\ !\ \Delta_1 \cup \Delta_2
+}
+\quad\textsc{(Seq)}
+\]
+
+\vspace{1em}
+\textbf{Interpretation:}
+\begin{itemize}
+  \item Run \( c_1 \), discard its result, then run \( c_2 \).
+  \item The resulting dirt includes effects from both computations.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Operation Call }
+
+\textbf{Assume:}
+\begin{itemize}
+  \item \( \iota : E^R \in \Gamma \)
+  \item \( \texttt{op} : A^{\texttt{op}} \rightarrow B^{\texttt{op}} \in \Sigma(E) \)
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Rule:}
+\[
+\frac{
+  \Gamma, y: B^{op}  \tvdash c : A^{\texttt{op}} \ !\ \Delta
+}{
+  \Gamma\tvdash \iota \# \texttt{op } c : B^{\texttt{op}} \ !\ \Delta \cup \{ \iota \# \texttt{op} \}
+}
+\quad\textsc{(Op)}
+\]
+
+\vspace{1em}
+
+\textbf{Interpretation:}
+\begin{itemize}
+  \item The argument \( c \) is itself a computation, not just a pure expression.
+  \item The dirt includes the dirt of \( c \), plus the label for the operation call.
+  \item This allows for effects to be embedded in the argument to the operation.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Handler Application}
+
+\textbf{Handler typing:}
+\[
+\Gamma \tvdash h : A\ !\ \Delta \Rightarrow B\ !\ \Delta'
+\qquad
+\Gamma \tvdash c : A\ !\ \Delta
+\]
+
+\textbf{Rule:}
+\[
+\frac{
+  \Gamma \tvdash h : A\ !\ \Delta \Rightarrow B\ !\ \Delta'
+  \quad
+  \Gamma \tvdash c : A\ !\ \Delta
+}{
+  \Gamma \tvdash \texttt{with } h \texttt{ handle } c : B\ !\ \Delta'
+}
+\quad\textsc{(Handle)}
+\]
+
+\vspace{1em}
+
+\textbf{Interpretation:}
+\begin{itemize}
+  \item Handler \( h \) handles all operations in \( \Delta \) performed by \( c \)
+  \item Produces a computation of type \( B\ !\ \Delta' \)
+  \item The dirt \( \Delta' \) reflects any effects left unhandled by \( h \)
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Handler Clause Type: \( C / \Delta \)}
+
+\textbf{Notation:}
+\[
+C / \Delta
+\quad \text{means: computation of type } C \text{ with handled dirt } \Delta
+\]
+
+\vspace{1em}
+
+\textbf{Example:}
+\[
+A\ !\ \Delta \;/\; \Delta
+\quad \text{means: computation of type } A\ !\ \Delta \text{ with all effects handled}
+\]
+
+\vspace{1em}
+
+\textbf{Usage:}
+\begin{itemize}
+  \item Appears in the type of a handler:
+  \[
+  \Gamma \tvdash h : A\ !\ \Delta \Rightarrow B\ !\ \Delta'
+  \]
+  \item The \texttt{val}-clause and each \texttt{op}-clause must be typed against \( C / \Delta \)
+  \item It expresses that all operations in \( \Delta \) are handled — and others must not appear
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Handler Definition (\textsc{Hand})}
+
+\textbf{Handler has the form:}
+\[
+\texttt{handler val } x \mapsto c_v \mid \texttt{op}_i\ x\ k \mapsto c_i
+\]
+
+\textbf{Rule:}
+\[
+\frac{
+  \Gamma, x : A \tvdash c_v : B\ !\ \Delta'
+  \quad
+  \Gamma \tvdash \texttt{ocs} : B\ !\ \Delta' / \Delta'' 
+  \quad \Delta \subset \Delta' \cup \Delta''
+}{
+  \Gamma \tvdash h : A\ !\ \Delta \Rightarrow B\ !\ \Delta'
+}
+\quad\textsc{(Hand)}
+\]
+
+\vspace{1em}
+
+\textbf{Interpretation:}
+\begin{itemize}
+  \item The \texttt{val}-clause transforms results of type \( A \) into computations of type \( B\ !\ \Delta' \)
+  \item The op-cases collectively handle all operations in \( \Delta \)
+  \item The resulting handler maps \( A\ !\ \Delta \) to \( B\ !\ \Delta' \)
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Op-Cases (Empty) — \textsc{OpCases-Nil}}
+
+\textbf{Rule:}
+\[
+\frac{}{\Gamma \tvdash nil_{C} : A\ !\ C / \emptyset  }
+\quad\textsc{(OpCases-Nil)}
+\]
+
+\vspace{1em}
+
+\textbf{Interpretation:}
+\begin{itemize}
+  \item An empty handler (no op-cases) can handle a computation with no effects
+  \item This is the base case for building op-cases recursively
+  \item The result dirt \( \Delta' \) can still be non-empty — it's from the `val` clause
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typing Rule: Op-Cases (Extend) — \textsc{OpCases-Cons}}
+
+\textbf{Exact rule from the paper:}
+
+\[
+\frac{
+  \begin{array}{l}
+    \iota : E^R \in \Gamma \quad\quad \texttt{op} : A^{\texttt{op}} \rightarrow B^{\texttt{op}} \in \Sigma(E) \\
+    \Gamma, x : A^{\texttt{op}},\ k : B^{\texttt{op}} \rightarrow C\ !\ \Delta''
+    \tvdash c : C\ !\ \Delta'' \\
+    \Gamma \tvdash \texttt{ocs} : C\ !\ \Delta''  / \Delta' 
+    \quad
+    \Delta \subset \Delta' \cup^. R \#op
+  \end{array}
+}{
+  \Gamma \tvdash (\iota \# \texttt{op } x\ k \mapsto c) \mid \texttt{ocs}
+  : C !\ \Delta'' / \Delta 
+}
+\quad\textsc{(OpCases-Cons)}
+\]
+
+\end{frame}

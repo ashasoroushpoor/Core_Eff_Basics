@@ -133,26 +133,135 @@ let pong =
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Message Passing: The Handler Orchestrates Interaction}
+\begin{frame}[fragile]{Message Passing via Effects: Part 3}
 \vspace{-0.5em}
-\begin{block}{\scriptsize A Simple Message Passing Handler}
+\begin{block}{\scriptsize The \texttt{run} Function Coordinates Both}
 \begin{scriptsize}
 \begin{verbatim}
-let rec run ping pong =
-  match ping() with
-  | effect Send msg -> run (fun () -> ping()) (fun () -> pong msg)
-  | effect Receive () -> match pong() with
-      | effect Send reply -> run (fun () -> ping reply) (fun () -> pong())
-      | val _ -> ()
-  | val _ -> ()
+let rec run pingside pongside =
+  match pingside () with
+  | v -> v
+  | effect (Send x) k1 ->
+    match pongside () with
+    | v -> v
+    | effect Receive k2 ->
+      run (fun () -> continue k1 ()) (fun () -> continue k2 x)
+  | _ -> failwith "Unexpected effect"
 \end{verbatim}
 \end{scriptsize}
 \end{block}
 
-\vspace{0.3em}
 \begin{itemize}
-  \item `ping()` and `pong()` are resumed via continuations.
-  \item The handler intercepts `Send` and `Receive`, and routes messages.
-  \item Implements **bidirectional control flow** via algebraic effects.
+  \item Handles \texttt{Send} from \texttt{ping}, \texttt{Receive} from \texttt{pong}.
+  \item Resumes each with continuation-passed values.
+  \item Models **cooperative message passing** purely via effects.
+\end{itemize}
+\end{frame}
+\begin{frame}[fragile]{6a: Programs Stay Pure, Effects Are Handled}
+\vspace{-0.5em}
+\begin{block}{\scriptsize Define Effects and Suspension State}
+\begin{scriptsize}
+\begin{verbatim}
+effect Send : int -> unit
+effect Receive : unit -> int
+
+type state =
+  | Done
+  | Paused of int * continuation
+  | PausedR of continuation
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+
+\begin{itemize}
+  \item Programs use effects via \texttt{perform}.
+  \item They don’t define what sending/receiving means.
+  \item Interpretation is delegated to the handler.
+\end{itemize}
+\end{frame}
+\begin{frame}[fragile]{6b: Programs as Pure Computations}
+\vspace{-0.5em}
+\begin{block}{\scriptsize Handlers Manage Interaction, Not the Programs}
+\begin{scriptsize}
+\begin{verbatim}
+let rec ping n =
+  if n > 0 then (
+    let m = perform (Send n);
+    Printf.printf "ping sent %d\n" m;
+    ping (n - 1)
+    
+  else 
+    return ()
+  )
+
+let rec pong () =
+  let n = perform Receive in
+  Printf.printf "pong received %d\n" n;
+  pong ()
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+
+\begin{itemize}
+  \item \texttt{ping} and \texttt{pong} describe logic only.
+  \item They don’t care who receives or replies.
+  \item They are \textbf{pure} computations.
+\end{itemize}
+\end{frame}
+\begin{frame}[fragile]{6c: Handlers for \texttt{ping} and \texttt{pong}}
+\vspace{-0.5em}
+\begin{block}{\scriptsize Handlers Pause and Resume Computations}
+\begin{scriptsize}
+\begin{verbatim}
+handler e 
+| unit |-> Done
+| Send x |-> 
+    fun k -> Paused (x, k)
+| Receive () |->
+    fun k -> PausedR k
+        
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+
+\begin{itemize}
+  \item Each handler manages its own computation.
+  \item Sending pauses the program; receiving continues it.
+\end{itemize}
+\end{frame}
+\begin{frame}[fragile]{6d: Driving Interaction with \texttt{run\_both}}
+\vspace{-0.5em}
+\begin{block}{\scriptsize Resuming Ping and Pong Step by Step}
+\begin{scriptsize}
+\begin{verbatim}
+let rec run_both p po =
+  match p with
+  | Done -> ()
+  | Paused x k ->
+    match po with
+    | PausedR k' -> run_both (k ()) (k' x)
+\end{verbatim}
+\end{scriptsize}
+\end{block}
+
+\begin{itemize}
+  \item \texttt{run\_both} drives both computations cooperatively.
+  \item At each step, \texttt{ping} sends, then \texttt{pong} receives and responds.
+  \item Effect handling is decoupled from computation structure.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The Goal of the Paper}
+\begin{itemize}
+  \item Propose an \textbf{effect system} for a core language with algebraic effects and handlers.
+  \item Track \textbf{computational effects} directly in types.
+  \item Provide a formal \textbf{operational semantics} and \textbf{type system}.
+  \item Handle practical challenges:
+  \begin{itemize}
+    \item \textbf{Poisoning problem}: how unhandled effects can spread.
+    \item \textbf{Subtyping} of effects and polymorphism.
+    \item \textbf{Coherence}: different derivations of typing should agree.
+  \end{itemize}
+  \item Keep the system small and expressive: \textbf{Core Eff}.
 \end{itemize}
 \end{frame}

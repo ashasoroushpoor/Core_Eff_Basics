@@ -8,10 +8,23 @@
 \documentclass{beamer}
 \usepackage{blindtext} %This package generates automatic text
 \usepackage{epigraph}
+\usepackage{bussproofs}
+\usepackage{amssymb}
+\usepackage{listings}
+
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning}
 \usetheme{focus}
-
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  keepspaces=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  escapeinside={(*@}{@*)}  % <- this allows inline math
+}
+\newcommand{\tvdash}{\mathrel{\text{\textbar\!\textminus}}}
 
 \definecolor{main}{RGB}{142, 111, 62}
 % \definecolor{text}{RGB}{60, 60, 80}
@@ -37,6 +50,10 @@
     
     % \input{tt}
     \input{section1}
+    \input{section2}
+    \input{section3}
+    \input{section4}
+    
     \input{end.tex}
    
 \end{document}

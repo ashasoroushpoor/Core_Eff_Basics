@@ -1,0 +1,175 @@
+\section{Syntax of Core Eff}
+\begin{frame}{Core Eff Syntax: Values}
+\textbf{Values (\texttt{v}):}
+\begin{itemize}
+  \item \texttt{x} \hfill (variable)
+  \item \texttt{fun x $\Rightarrow$ c} \hfill (function abstraction)
+  \item \texttt{handler val x $\Rightarrow$ c\textsubscript{v} \\
+  \hspace{3.5em} | op x k $\Rightarrow$ c\textsubscript{op}} \hfill (handler)
+\end{itemize}
+
+\vspace{1em}
+Values are inert — they do not trigger computation by themselves.  
+Handlers are first-class values that define what to do with operations.
+\end{frame}
+\begin{frame}{Core Eff Syntax: Computations}
+\textbf{Computations (\texttt{c}):}
+\begin{itemize}
+  \item \texttt{val v} \hfill (pure return)
+  \item \texttt{v v'} \hfill (function application)
+  \item \texttt{let x = c$_1$ in c$_2$} \hfill (sequential binding)
+  \item \texttt{e \# op v} \hfill (invoke operation \texttt{op} on effect instance \texttt{e})
+  \item \texttt{with v handle c} \hfill (handle computation with \texttt{v})
+\end{itemize}
+
+\vspace{1em}
+Computations represent steps of execution.  
+They may perform effects and must be run to produce results.
+\end{frame}
+
+
+\begin{frame}{Core Eff Syntax: Types (with \texttt{E$^R$})}
+\textbf{Pure types (\texttt{A, B}):}
+\begin{itemize}
+  \item \texttt{bool} \hfill (booleans)
+  \item \texttt{nat} \hfill (natural numbers)
+  \item \texttt{E$^R$} \hfill (effect instance: name of effect \texttt{E} at region \texttt{R})
+  \item \texttt{A $\rightarrow$ C} \hfill (functions from pure to computation)
+  \item \texttt{C $\Rightarrow$ D} \hfill (handlers from computation to computation)
+\end{itemize}
+
+\vspace{1em}
+\textbf{Dirty types (\texttt{C}):}
+\begin{itemize}
+  \item \texttt{A ! $\Delta$} \hfill (computations returning \texttt{A} and performing effects $\Delta$)
+\end{itemize}
+
+\vspace{1em}
+\textbf{Explanation:}
+\begin{itemize}
+  \item \texttt{E$^R$} is the type of an \textbf{effect instance}.
+  \item \texttt{E} is an effect (like \texttt{State} or \texttt{IO}), \texttt{R} is a \textbf{region variable} that scopes the instance.
+  \item Effect instances are passed as pure values and used in operations (e.g., \texttt{e \# op v}).
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Regions, Dirt, and Operation Signatures}
+
+\textbf{Region variables (\( R \)):}
+\begin{itemize}
+  \item Abstract names that identify \textbf{effect instances}.
+  \item Appear in types like \( E^R \), where \( E \) is an effect (e.g., State, Exception).
+  \item Allow fine-grained tracking of effects tied to specific instances.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Dirt (\( \Delta \)):}
+\begin{itemize}
+  \item A \textbf{finite set of operations} the computation may perform.
+  \item Each element has the form \( \iota \# \texttt{op} \), where \( \iota \) is an effect instance.
+  \item Appears in dirty types: \( A ! \Delta \)
+\end{itemize}
+
+\vspace{1em}
+\textbf{Effect signature (\( \Sigma \)):}
+\begin{itemize}
+  \item Maps each effect name \( E \) to a set of operations:
+  \[
+    \Sigma(E) = \{ \texttt{op}_i : A_i \rightarrow B_i \}
+  \]
+  \item Each operation has a parameter type \( A_i \) and result type \( B_i \).
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Core Eff: Effect Sets and Interpretation}
+\textbf{Effect set $\Delta$:}
+\begin{itemize}
+  \item A finite set of operations the computation may perform.
+  \item Written as \texttt{\{State.get, Exn.raise, IO.print\}}, etc.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Effectful computation type:}
+\begin{itemize}
+  \item \texttt{int ! \{State.get, State.put\}} \\
+    means the computation returns an \texttt{int}, but may access state.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Key idea:} types describe both \textit{what is computed} and \textit{what effects may occur}.
+\end{frame}
+
+\begin{frame}{Pure vs Dirty Types}
+\textbf{Pure types:}
+\begin{itemize}
+  \item Describe \textbf{values only}.
+  \item Examples:
+    \begin{itemize}
+      \item \texttt{nat}, \texttt{bool}, \texttt{E$^R$}
+      \item \texttt{nat $\rightarrow$ bool ! $\Delta$} (functions)
+      \item \texttt{C $\Rightarrow$ D} (handlers)
+    \end{itemize}
+  \item Cannot perform any effect on their own.
+\end{itemize}
+
+\vspace{1em}
+\textbf{Dirty types:}
+\begin{itemize}
+  \item Describe \textbf{computations}.
+  \item Syntax: \texttt{A ! $\Delta$}
+  \item Means: produces a value of type \texttt{A} and may perform effects in $\Delta$.
+  \item Example: \texttt{bool ! \{State.get, State.put\}}
+\end{itemize}
+
+\vspace{1em}
+\textbf{Key distinction:} only dirty types describe computations that can perform effects.
+\end{frame}
+
+\begin{frame}{Function and Handler Types in Action}
+\textbf{Function types:} \texttt{A $\rightarrow$ C}
+\begin{itemize}
+  \item Takes a \textbf{pure argument} of type \texttt{A}
+  \item Returns a \textbf{dirty computation} of type \texttt{C}
+  \item Example: \texttt{nat $\rightarrow$ bool ! \{Exn.raise\}}
+\end{itemize}
+
+\vspace{1em}
+\textbf{Handler types:} \texttt{C $\Rightarrow$ D}
+\begin{itemize}
+  \item Transforms a computation of type \texttt{C} into one of type \texttt{D}
+  \item Typically used with \texttt{with h handle c}
+  \item Example:
+    \begin{itemize}
+      \item \texttt{bool ! \{Choose\} $\Rightarrow$ list bool ! \{\}} \\
+        (handler that explores both choices and returns all outcomes)
+    \end{itemize}
+\end{itemize}
+
+\vspace{1em}
+\textbf{Note:} Handlers are values that accept and transform computations.
+\end{frame}
+
+\begin{frame}{Overview of Typing Rules}
+\begin{itemize}
+  \item The typing system tracks both:
+  \begin{itemize}
+    \item \textbf{Pure types} (e.g., \texttt{bool}, \texttt{nat}): values with no effects.
+    \item \textbf{Dirty types} (e.g., \texttt{bool ! \{Exn.raise\}}): computations that may perform effects.
+  \end{itemize}
+
+  \item \textbf{Effect annotations} describe which operations a computation may perform.
+  \begin{itemize}
+    \item Example: \texttt{A ! \{State.get, Exn.raise\}}
+  \end{itemize}
+
+  \item \textbf{Typing rules} ensure:
+  \begin{itemize}
+    \item Effectful programs are properly annotated.
+    \item Handlers transform computations safely.
+    \item Subtyping works with effect sets.
+  \end{itemize}
+
+  \item \textbf{Key challenge:} Combining effects and continuations while preserving type safety.
+\end{itemize}
+\end{frame}
